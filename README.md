@@ -34,7 +34,7 @@ Real-time system metrics · Docker management · GitHub activity — in one beau
 ### Option 1 — Docker (recommended)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/PulseBoard.git
+git clone https://github.com/MohsinSyed130605/PulseBoard.git
 cd PulseBoard
 cp .env.example .env        # add your GITHUB_TOKEN
 docker compose up -d
@@ -46,7 +46,7 @@ docker compose up -d
 ### Option 2 — Desktop App (Electron)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/PulseBoard.git
+git clone https://github.com/MohsinSyed130605/PulseBoard.git
 cd PulseBoard
 npm install --legacy-peer-deps
 pip install -r backend/requirements.txt

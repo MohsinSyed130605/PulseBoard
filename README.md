@@ -125,3 +125,4 @@ Swagger UI available at `http://localhost:8000/docs`.
 
 Key endpoints: `/health` · `/api/system-metrics` · `/api/containers` · `/api/images` · `/api/settings`
 
+

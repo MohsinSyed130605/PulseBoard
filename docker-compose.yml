@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pulseboard-backend
+    ports:
+      # Bind to localhost ONLY — prevents external access to the API.
+      # Remove the 127.0.0.1: prefix only if you intentionally need remote access
+      # and have set PULSEBOARD_API_KEY to a strong secret.
+      - "127.0.0.1:8000:8000"
+    environment:
+      - DB_PATH=/app/data/settings.db
+      # GitHub Personal Access Token — set in your .env file or shell environment
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      # PulseBoard API Key — leave empty to disable auth in local/dev mode
+      - PULSEBOARD_API_KEY=${PULSEBOARD_API_KEY}
+    volumes:
+      # Mount SQLite DB directory to persist settings on the host
+      - ./backend/data:/app/data
+      # Mount the Docker daemon socket read-only to monitor host container statuses
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pulseboard-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

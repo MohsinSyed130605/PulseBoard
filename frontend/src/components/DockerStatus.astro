@@ -1,0 +1,226 @@
+---
+// DockerStatus.astro — Real container management with start/stop/restart/logs
+---
+
+<div class="ios-glass rounded-[24px] flex flex-col w-full overflow-hidden">
+  <!-- Header Panel -->
+  <div class="px-5 py-3.5 border-b border-white/5 flex justify-between items-center bg-white/[0.02] shrink-0">
+    <div class="flex items-center gap-2.5">
+      <span class="material-symbols-outlined text-[#00d4ff] text-base">view_in_ar</span>
+      <h3 class="font-mono text-xs font-bold tracking-wider text-[#00d4ff] uppercase">Docker Containers</h3>
+      <span id="docker-count-badge" class="font-mono text-[9px] text-[#bbc9cf]/60 bg-white/[0.05] px-2 py-0.5 rounded-full">—</span>
+    </div>
+    <button id="docker-refresh-btn" title="Refresh" class="text-[#00d4ff]/70 hover:text-[#00d4ff] flex items-center cursor-pointer select-none active:scale-90 transition-all">
+      <span class="material-symbols-outlined text-base">refresh</span>
+    </button>
+  </div>
+
+  <!-- List Area -->
+  <div class="overflow-y-auto p-3 max-h-[400px]">
+    <div id="docker-containers-list" class="flex flex-col gap-2">
+      <div class="py-12 text-center font-mono text-xs text-[#bbc9cf] animate-pulse">
+        Querying Docker daemon...
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Log Viewer Modal -->
+<div id="log-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+  <div class="ios-glass rounded-[24px] w-full max-w-4xl h-[70vh] flex flex-col overflow-hidden border border-white/[0.08] shadow-2xl">
+    <div class="px-5 py-3.5 border-b border-white/[0.06] flex justify-between items-center shrink-0 bg-white/[0.02]">
+      <div class="flex items-center gap-2.5">
+        <span class="material-symbols-outlined text-[#00d4ff] text-base">terminal</span>
+        <span id="log-modal-title" class="font-mono text-xs font-bold text-[#00d4ff] tracking-wider uppercase">Container Logs</span>
+      </div>
+      <button id="log-modal-close" class="text-[#bbc9cf]/50 hover:text-white cursor-pointer transition-colors">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-4 font-mono text-[11px] leading-relaxed">
+      <pre id="log-modal-content" class="text-[#bbc9cf]/80 whitespace-pre-wrap break-all"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+  const BACKEND = () => localStorage.getItem('pulseboard_backend_url') || 'http://localhost:8000';
+
+  // ── Render containers ────────────────────────────────────────────────────────
+  async function updateContainers() {
+    const listEl = document.getElementById('docker-containers-list');
+    const countBadge = document.getElementById('docker-count-badge');
+    if (!listEl) return;
+
+    try {
+      const res = await fetch(`${BACKEND()}/api/containers`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: { reason: res.statusText } }));
+        const reason = err?.detail?.reason || err?.detail || res.statusText;
+        const fix = err?.detail?.fix || '';
+        throw new Error(reason + (fix ? '\n\n' + fix : ''));
+      }
+
+      const data = await res.json();
+      if (countBadge) countBadge.textContent = `${data.count} containers`;
+
+      if (!data.containers || data.containers.length === 0) {
+        listEl.innerHTML = `<div class="py-12 text-center font-mono text-xs text-[#bbc9cf]">No containers found on the host Docker daemon.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = data.containers.map(c => {
+        const isRunning = c.state === 'running';
+        const pipClass = isRunning ? 'status-pip-green' : 'status-pip-red';
+        const stateColor = isRunning ? 'text-[#34c759]' : 'text-[#ff3b30]';
+        const portsHtml = c.ports && c.ports.length
+          ? `<span class="font-mono text-[9px] text-[#00d4ff]/60 mt-0.5">${c.ports.slice(0, 3).join('  ')}</span>`
+          : '';
+        const cpuHtml = c.cpuPct !== null && c.cpuPct !== undefined
+          ? `<span class="font-mono text-[9px] text-[#bbc9cf]/60">CPU ${c.cpuPct}%</span>`
+          : '';
+        const memHtml = c.memMB !== null && c.memMB !== undefined
+          ? `<span class="font-mono text-[9px] text-[#bbc9cf]/60">${c.memMB}MB</span>`
+          : '';
+
+        // Action buttons
+        const startBtn = !isRunning
+          ? `<button data-action="start" data-name="${c.name}" title="Start" class="action-btn text-[#34c759]/70 hover:text-[#34c759]"><span class="material-symbols-outlined text-base">play_arrow</span></button>`
+          : '';
+        const stopBtn = isRunning
+          ? `<button data-action="stop" data-name="${c.name}" title="Stop" class="action-btn text-[#ff3b30]/70 hover:text-[#ff3b30]"><span class="material-symbols-outlined text-base">stop</span></button>`
+          : '';
+        const restartBtn = `<button data-action="restart" data-name="${c.name}" title="Restart" class="action-btn text-[#ff9500]/70 hover:text-[#ff9500]"><span class="material-symbols-outlined text-base">restart_alt</span></button>`;
+        const logsBtn = `<button data-action="logs" data-name="${c.name}" title="View Logs" class="action-btn text-[#bbc9cf]/50 hover:text-[#bbc9cf]"><span class="material-symbols-outlined text-base">receipt_long</span></button>`;
+
+        return `
+          <div class="flex items-center justify-between p-3 rounded-[16px] bg-white/[0.02] border border-white/[0.04] transition-all hover:bg-white/[0.04] gap-3">
+            <!-- Left: name + image + ports -->
+            <div class="flex flex-col min-w-0 flex-1 gap-0.5">
+              <div class="flex items-center gap-2">
+                <span class="${pipClass} shrink-0"></span>
+                <span class="text-sm font-semibold text-white truncate max-w-[180px]">${c.name}</span>
+              </div>
+              <span class="font-mono text-[10px] text-[#bbc9cf] opacity-55 truncate max-w-[220px] pl-[15px]">${c.image}</span>
+              ${portsHtml ? `<div class="pl-[15px]">${portsHtml}</div>` : ''}
+            </div>
+
+            <!-- Middle: resource stats -->
+            <div class="hidden sm:flex flex-col items-end gap-0.5 shrink-0 min-w-[70px]">
+              <span class="font-mono text-xs font-semibold ${stateColor} capitalize">${c.state}</span>
+              ${cpuHtml}
+              ${memHtml}
+            </div>
+
+            <!-- Right: action buttons -->
+            <div class="flex items-center gap-1 shrink-0">
+              ${startBtn}${stopBtn}${restartBtn}${logsBtn}
+            </div>
+          </div>`;
+      }).join('');
+
+      // Bind action buttons
+      listEl.querySelectorAll('.action-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const action = btn.getAttribute('data-action');
+          const name = btn.getAttribute('data-name');
+          if (action === 'logs') {
+            openLogs(name);
+          } else {
+            doContainerAction(action, name, btn);
+          }
+        });
+      });
+
+    } catch (e) {
+      if (countBadge) countBadge.textContent = 'Error';
+      listEl.innerHTML = `
+        <div class="py-8 flex flex-col items-center gap-3 text-center px-4">
+          <span class="material-symbols-outlined text-[#ff3b30] text-3xl">link_off</span>
+          <div class="flex flex-col gap-1">
+            <span class="font-mono text-xs font-bold text-[#ff3b30]">Docker Daemon Unreachable</span>
+            <p class="font-mono text-[10px] text-[#bbc9cf]/70 leading-relaxed max-w-sm whitespace-pre-wrap">${e.message}</p>
+          </div>
+        </div>`;
+      console.error('[DockerStatus]', e.message);
+    }
+  }
+
+  // ── Container actions ────────────────────────────────────────────────────────
+  async function doContainerAction(action, name, btnEl) {
+    const icon = btnEl.querySelector('span');
+    if (icon) icon.textContent = 'hourglass_empty';
+    btnEl.disabled = true;
+
+    try {
+      const res = await fetch(`${BACKEND()}/api/containers/${encodeURIComponent(name)}/${action}`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err?.detail || res.statusText);
+      }
+      // Refresh list after action
+      await updateContainers();
+    } catch (e) {
+      alert(`Failed to ${action} "${name}":\n${e.message}`);
+      if (icon) icon.textContent = action === 'stop' ? 'stop' : action === 'restart' ? 'restart_alt' : 'play_arrow';
+      btnEl.disabled = false;
+    }
+  }
+
+  // ── Log viewer ───────────────────────────────────────────────────────────────
+  async function openLogs(name) {
+    const modal = document.getElementById('log-modal');
+    const title = document.getElementById('log-modal-title');
+    const content = document.getElementById('log-modal-content');
+    if (!modal || !content) return;
+
+    if (title) title.textContent = `Logs — ${name}`;
+    if (content) content.textContent = 'Fetching logs…';
+    modal.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`${BACKEND()}/api/containers/${encodeURIComponent(name)}/logs?tail=200`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      const data = await res.json();
+      content.textContent = data.lines.join('\n') || '(no output)';
+      // Scroll to bottom
+      content.parentElement?.scrollTo(0, content.parentElement.scrollHeight);
+    } catch (e) {
+      content.textContent = `Error fetching logs:\n${e.message}`;
+    }
+  }
+
+  // Close modal
+  document.getElementById('log-modal-close')?.addEventListener('click', () => {
+    document.getElementById('log-modal')?.classList.add('hidden');
+  });
+  document.getElementById('log-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) document.getElementById('log-modal')?.classList.add('hidden');
+  });
+
+  // Refresh button
+  document.getElementById('docker-refresh-btn')?.addEventListener('click', () => {
+    const icon = document.querySelector('#docker-refresh-btn span');
+    if (icon) { icon.classList.add('animate-spin'); setTimeout(() => icon.classList.remove('animate-spin'), 600); }
+    updateContainers();
+  });
+
+  updateContainers();
+  setInterval(updateContainers, 8000);
+  window.addEventListener('storage', updateContainers);
+  window.addEventListener('refreshContainers', updateContainers);
+</script>
+
+<style>
+  .animate-spin { animation: spin 0.6s linear; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .action-btn { 
+    display: flex; align-items: center; cursor: pointer; 
+    transition: all 0.15s; border-radius: 8px; padding: 4px;
+    background: transparent; border: none;
+  }
+  .action-btn:hover { background: rgba(255,255,255,0.06); }
+  .action-btn:active { transform: scale(0.88); }
+  .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>

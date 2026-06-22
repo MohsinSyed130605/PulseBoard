@@ -1,0 +1,25 @@
+# Dependency directories
+node_modules/
+
+# Build outputs
+dist/
+.astro/
+.wrangler/
+
+# Version control and IDEs
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Miscellaneous
+.DS_Store
+README.md
+Dockerfile
+n8n/

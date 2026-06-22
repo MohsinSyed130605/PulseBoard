@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+/* ══════════════════════════════════════════════════════════════
+   CSS CUSTOM PROPERTIES — Dark Mode (default)
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  --pb-bg:         #070708;
+  --pb-bg-grad:    radial-gradient(circle at 50% 50%, #161a22 0%, #060708 100%);
+  --pb-panel:      rgba(16, 18, 22, 0.55);
+  --pb-panel-hov:  rgba(16, 18, 22, 0.75);
+  --pb-input:      #14161a;
+  --pb-text:       #e5e2e1;
+  --pb-text-sub:   #bbc9cf;
+  --pb-border:     rgba(255, 255, 255, 0.07);
+  --pb-border-acc: rgba(0, 212, 255, 0.25);
+  --pb-scrollbar:  rgba(255, 255, 255, 0.08);
+  --pb-glow-1:     rgba(0, 212, 255, 0.10);
+  --pb-glow-2:     rgba(52, 199, 89, 0.05);
+  --pb-glow-3:     rgba(168, 85, 247, 0.05);
+  --pb-skeuo-bg:   linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+  --pb-skeuo-bdr:  rgba(255, 255, 255, 0.12);
+  --pb-skeuo-shad: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -2px rgba(0,0,0,0.5),
+                   inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 2px rgba(0,0,0,0.4);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CSS CUSTOM PROPERTIES — Light Mode override
+   ══════════════════════════════════════════════════════════════ */
+html[data-theme="light"] {
+  --pb-bg:         #eef1f6;
+  --pb-bg-grad:    radial-gradient(circle at 50% 50%, #dce8f8 0%, #e8edf5 100%);
+  --pb-panel:      rgba(255, 255, 255, 0.65);
+  --pb-panel-hov:  rgba(255, 255, 255, 0.85);
+  --pb-input:      #f0f2f6;
+  --pb-text:       #0f1724;
+  --pb-text-sub:   #4a5a6a;
+  --pb-border:     rgba(0, 0, 0, 0.09);
+  --pb-border-acc: rgba(0, 140, 180, 0.35);
+  --pb-scrollbar:  rgba(0, 0, 0, 0.12);
+  --pb-glow-1:     rgba(0, 180, 230, 0.12);
+  --pb-glow-2:     rgba(34, 160, 80, 0.08);
+  --pb-glow-3:     rgba(120, 60, 200, 0.06);
+  --pb-skeuo-bg:   linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(230,235,245,0.8) 100%);
+  --pb-skeuo-bdr:  rgba(0, 0, 0, 0.14);
+  --pb-skeuo-shad: 0 4px 6px -1px rgba(0,0,0,0.12), 0 2px 4px -2px rgba(0,0,0,0.10),
+                   inset 0 1px 0 rgba(255,255,255,0.9), inset 0 -1px 2px rgba(0,0,0,0.06);
+}
+
+/* Base */
+html {
+  font-family: 'Outfit', sans-serif;
+  background-color: var(--pb-bg);
+  color: var(--pb-text);
+  scroll-behavior: smooth;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+body { background: var(--pb-bg-grad); transition: background 0.3s ease; }
+code, pre { font-family: 'JetBrains Mono', monospace; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--pb-scrollbar); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+/* Glassmorphism panels */
+.glass-panel, .ios-glass {
+  background: var(--pb-panel);
+  backdrop-filter: blur(25px) saturate(180%);
+  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  border: 1px solid var(--pb-border);
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.10), inset 0 -1px 1px rgba(0,0,0,0.06);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+html[data-theme="light"] .glass-panel,
+html[data-theme="light"] .ios-glass {
+  box-shadow: 0 8px 24px -8px rgba(0,0,0,0.12), inset 0 1px 1px rgba(255,255,255,0.95), inset 0 -1px 1px rgba(0,0,0,0.03);
+}
+
+/* Skeuomorphic buttons */
+.btn-skeuo {
+  position: relative;
+  background: var(--pb-skeuo-bg);
+  border: 1px solid var(--pb-skeuo-bdr);
+  border-bottom-color: rgba(255,255,255,0.06);
+  box-shadow: var(--pb-skeuo-shad);
+  transition: all 0.15s cubic-bezier(0.4,0,0.2,1);
+  color: var(--pb-text-sub);
+}
+html[data-theme="light"] .btn-skeuo { border-bottom-color: rgba(0,0,0,0.08); color: var(--pb-text-sub); }
+.btn-skeuo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 50%);
+  pointer-events: none;
+}
+.btn-skeuo:hover { background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%); box-shadow: 0 6px 12px -2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25); }
+html[data-theme="light"] .btn-skeuo:hover { background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(235,240,250,0.9) 100%); }
+.btn-skeuo:active { transform: translateY(1.5px); background: linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.02) 100%); box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset 0 2px 4px rgba(0,0,0,0.15); }
+
+.btn-skeuo-active {
+  background: linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 100%) !important;
+  border: 1px solid var(--pb-border-acc) !important;
+  border-top-color: rgba(0,0,0,0.3) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15), 0 0 12px rgba(0,212,255,0.15), inset 0 2px 4px rgba(0,0,0,0.25), inset 0 -1px 0 rgba(255,255,255,0.05) !important;
+  color: #00d4ff !important;
+}
+html[data-theme="light"] .btn-skeuo-active {
+  background: linear-gradient(180deg, rgba(0,180,220,0.12) 0%, rgba(0,140,180,0.06) 100%) !important;
+  border-color: rgba(0,160,200,0.4) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 12px rgba(0,180,220,0.15), inset 0 1px 3px rgba(0,0,0,0.06) !important;
+  color: #0080aa !important;
+}
+
+.btn-skeuo-cyan {
+  background: linear-gradient(180deg, rgba(0,212,255,0.85) 0%, rgba(0,150,185,0.85) 100%);
+  border: 1px solid rgba(0,212,255,0.6);
+  border-bottom-color: rgba(0,100,130,0.8);
+  color: #000;
+  font-weight: 700;
+  box-shadow: 0 4px 8px rgba(0,212,255,0.2), 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 2px rgba(0,0,0,0.2);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+}
+.btn-skeuo-cyan:hover { background: linear-gradient(180deg, rgba(0,212,255,0.95) 0%, rgba(0,170,205,0.95) 100%); box-shadow: 0 6px 16px rgba(0,212,255,0.3), inset 0 1px 0 rgba(255,255,255,0.4); }
+.btn-skeuo-cyan:active { transform: translateY(1.5px); background: linear-gradient(180deg, rgba(0,110,140,0.9) 0%, rgba(0,80,100,0.9) 100%); box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset 0 2px 4px rgba(0,0,0,0.4); text-shadow: none; }
+
+/* Status pips */
+.status-pip-green,.status-pip-red,.status-pip-orange { width:7px; height:7px; border-radius:50%; flex-shrink:0; display:inline-block; }
+.status-pip-green  { background:#34c759; box-shadow:0 0 6px #34c759; }
+.status-pip-red    { background:#ff3b30; box-shadow:0 0 6px #ff3b30; }
+.status-pip-orange { background:#ff9500; box-shadow:0 0 6px #ff9500; }
+
+/* Glows & animations */
+.glow-cyan { text-shadow: 0 0 8px rgba(0,212,255,0.4); }
+.progress-bar-anim { animation: progress-pulse 2s infinite alternate; }
+@keyframes progress-pulse {
+  0%   { opacity: 0.85; }
+  100% { opacity: 1; box-shadow: 0 0 6px rgba(0,212,255,0.7); }
+}
+
+/* Light mode overrides */
+html[data-theme="light"] input[type="text"],
+html[data-theme="light"] input[type="number"] { background: var(--pb-input) !important; color: var(--pb-text) !important; border-color: rgba(0,0,0,0.12) !important; }
+html[data-theme="light"] .font-mono { color: var(--pb-text-sub); }
+html[data-theme="light"] .text-white { color: var(--pb-text) !important; }
+
+/* Toast notifications */
+#pb-toast-container { position: fixed; top: 1.25rem; right: 1.25rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
+.pb-toast {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  padding: 0.875rem 1.125rem; border-radius: 14px;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(20,22,28,0.92); color: #fff;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  max-width: 340px; pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  animation: toast-in 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+.pb-toast.warning { border-color: rgba(255,149,0,0.35); }
+.pb-toast.error   { border-color: rgba(255,59,48,0.35); }
+.pb-toast.success { border-color: rgba(52,199,89,0.35); }
+html[data-theme="light"] .pb-toast { background: rgba(255,255,255,0.95); color: #0f1724; border-color: rgba(0,0,0,0.1); }
+
+@keyframes toast-in  { from { opacity:0; transform: translateX(20px) scale(0.95); } to { opacity:1; transform: translateX(0) scale(1); } }
+@keyframes toast-out { from { opacity:1; transform: translateX(0) scale(1); } to { opacity:0; transform: translateX(20px) scale(0.92); } }
+.pb-toast.dismissing { animation: toast-out 0.2s ease forwards; }

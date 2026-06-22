@@ -1,0 +1,45 @@
+# ─── Build output ─────────────────────────────────────────────────────────────
+dist/
+.astro/
+
+# ─── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ─── Environment files ────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── SQLite databases and persistent data ─────────────────────────────────────
+*.db
+*.sqlite
+backend/data/
+backend/settings.db
+
+# ─── Electron build output ────────────────────────────────────────────────────
+electron/dist/
+electron/out/
+
+# ─── OS-specific files ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── IDE settings ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+
+# ─── Backup folders ───────────────────────────────────────────────────────────
+backup_*/

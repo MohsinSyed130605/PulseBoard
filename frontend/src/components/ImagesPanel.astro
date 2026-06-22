@@ -1,0 +1,231 @@
+---
+// ImagesPanel.astro — Docker image management: list, pull, remove, prune
+---
+
+<div class="flex flex-col gap-4 w-full">
+
+  <!-- Pull + Prune toolbar -->
+  <div class="ios-glass rounded-[20px] p-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+    <div class="flex flex-1 gap-2 w-full">
+      <input
+        id="pull-image-input"
+        type="text"
+        placeholder="nginx:latest  or  ubuntu:22.04"
+        class="flex-1 rounded-[10px] px-3 py-2.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-[#00d4ff]/40 border"
+        style="background:var(--pb-input); color:var(--pb-text); border-color:var(--pb-border);"
+      />
+      <button id="pull-image-btn" class="btn-skeuo-cyan px-4 py-2.5 rounded-[10px] font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+        <span class="material-symbols-outlined text-sm">download</span>
+        Pull
+      </button>
+    </div>
+    <button id="prune-images-btn" title="Remove all dangling images" class="btn-skeuo px-4 py-2.5 rounded-[10px] font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 shrink-0 text-[#ff9500]">
+      <span class="material-symbols-outlined text-sm">cleaning_services</span>
+      Prune dangling
+    </button>
+  </div>
+
+  <!-- Image list -->
+  <div class="ios-glass rounded-[20px] overflow-hidden">
+    <div class="px-5 py-3 border-b flex justify-between items-center" style="border-color:var(--pb-border)">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-[#00d4ff] text-base">inventory_2</span>
+        <h3 class="font-mono text-xs font-bold tracking-wider text-[#00d4ff] uppercase">Local Images</h3>
+        <span id="images-count-badge" class="font-mono text-[9px] opacity-50 px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.05); color:var(--pb-text-sub)">—</span>
+      </div>
+      <button id="images-refresh-btn" title="Refresh" class="text-[#00d4ff]/70 hover:text-[#00d4ff] cursor-pointer active:scale-90 transition-all">
+        <span class="material-symbols-outlined text-base">refresh</span>
+      </button>
+    </div>
+
+    <div class="overflow-y-auto max-h-[480px]">
+      <div id="images-list" class="flex flex-col">
+        <div class="py-16 text-center font-mono text-xs animate-pulse" style="color:var(--pb-text-sub)">
+          Loading images...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status message bar -->
+  <div id="images-status-bar" class="hidden ios-glass rounded-[14px] px-4 py-3 flex items-center gap-3 font-mono text-xs" style="color:var(--pb-text-sub)">
+    <span id="images-status-icon" class="material-symbols-outlined text-base text-[#34c759]">check_circle</span>
+    <span id="images-status-text"></span>
+  </div>
+
+</div>
+
+<script>
+  const BACKEND = () => localStorage.getItem('pulseboard_backend_url') || 'http://localhost:8000';
+
+  function showStatus(msg, type = 'success') {
+    const bar = document.getElementById('images-status-bar');
+    const icon = document.getElementById('images-status-icon');
+    const text = document.getElementById('images-status-text');
+    if (!bar || !icon || !text) return;
+    const iconMap = { success: 'check_circle', error: 'error', info: 'info', warning: 'warning' };
+    const colorMap = { success: '#34c759', error: '#ff3b30', info: '#00d4ff', warning: '#ff9500' };
+    icon.textContent = iconMap[type] || 'info';
+    icon.style.color = colorMap[type] || '#00d4ff';
+    text.textContent = msg;
+    bar.classList.remove('hidden');
+    setTimeout(() => bar.classList.add('hidden'), 5000);
+  }
+
+  async function loadImages() {
+    const listEl = document.getElementById('images-list');
+    const countBadge = document.getElementById('images-count-badge');
+    if (!listEl) return;
+
+    listEl.innerHTML = `<div class="py-16 text-center font-mono text-[11px] animate-pulse" style="color:var(--pb-text-sub)">Querying Docker daemon...</div>`;
+
+    try {
+      const res = await fetch(`${BACKEND()}/api/images`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: { reason: res.statusText } }));
+        throw new Error(err?.detail?.reason || err?.detail || res.statusText);
+      }
+      const data = await res.json();
+      if (countBadge) countBadge.textContent = `${data.count} images`;
+
+      if (!data.images || data.images.length === 0) {
+        listEl.innerHTML = `<div class="py-16 text-center font-mono text-xs" style="color:var(--pb-text-sub)">No local images found.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = data.images.map(img => {
+        const primaryTag = img.tags[0];
+        const extraTags = img.tags.slice(1);
+        const isDangling = primaryTag === '<none>:<none>';
+        return `
+          <div class="flex items-center justify-between px-4 py-3 border-b transition-all hover:bg-white/[0.02]" style="border-color:var(--pb-border)">
+            <div class="flex flex-col min-w-0 flex-1 gap-0.5">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-mono text-xs font-semibold truncate max-w-xs ${isDangling ? 'opacity-40 italic' : ''}" style="color:var(--pb-text)">${primaryTag}</span>
+                ${extraTags.map(t => `<span class="font-mono text-[9px] px-1.5 py-0.5 rounded-full border" style="color:var(--pb-text-sub);border-color:var(--pb-border)">${t}</span>`).join('')}
+                ${isDangling ? `<span class="font-mono text-[9px] text-[#ff9500] px-1.5 py-0.5 rounded-full bg-[#ff9500]/10">dangling</span>` : ''}
+              </div>
+              <div class="flex gap-3 font-mono text-[10px]" style="color:var(--pb-text-sub)">
+                <span>${img.sizeMB} MB</span>
+                <span class="opacity-50">·</span>
+                <span class="font-mono text-[9px] opacity-50">${img.id}</span>
+                <span class="opacity-50">·</span>
+                <span class="opacity-60">${img.created}</span>
+              </div>
+            </div>
+            <button
+              data-image-id="${img.id}"
+              data-image-tag="${primaryTag}"
+              title="Remove image"
+              class="remove-image-btn ml-3 shrink-0 flex items-center justify-center w-8 h-8 rounded-[8px] text-[#ff3b30]/50 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 transition-all active:scale-90 cursor-pointer border-0 bg-transparent"
+            >
+              <span class="material-symbols-outlined text-base">delete</span>
+            </button>
+          </div>`;
+      }).join('');
+
+      // Bind remove buttons
+      listEl.querySelectorAll('.remove-image-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-image-id');
+          const tag = btn.getAttribute('data-image-tag');
+          if (!confirm(`Remove image "${tag}"?\n\nThis cannot be undone. Containers using this image must be stopped first.`)) return;
+          btn.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">hourglass_empty</span>';
+          btn.disabled = true;
+          try {
+            const r = await fetch(`${BACKEND()}/api/images/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            if (!r.ok) {
+              const err = await r.json().catch(() => ({ detail: r.statusText }));
+              throw new Error(err?.detail || r.statusText);
+            }
+            showStatus(`Removed "${tag}" successfully.`, 'success');
+            await loadImages();
+          } catch (e) {
+            showStatus(`Failed to remove "${tag}": ${e.message}`, 'error');
+            btn.innerHTML = '<span class="material-symbols-outlined text-base">delete</span>';
+            btn.disabled = false;
+          }
+        });
+      });
+
+    } catch (e) {
+      if (countBadge) countBadge.textContent = 'Error';
+      listEl.innerHTML = `
+        <div class="py-12 flex flex-col items-center gap-3 text-center px-6">
+          <span class="material-symbols-outlined text-[#ff3b30] text-3xl">link_off</span>
+          <span class="font-mono text-xs font-bold text-[#ff3b30]">Docker Daemon Unreachable</span>
+          <p class="font-mono text-[10px] opacity-70 leading-relaxed max-w-sm" style="color:var(--pb-text-sub)">${e.message}</p>
+        </div>`;
+      console.error('[ImagesPanel]', e.message);
+    }
+  }
+
+  // Pull image
+  document.getElementById('pull-image-btn')?.addEventListener('click', async () => {
+    const input = document.getElementById('pull-image-input');
+    const repo = input?.value?.trim();
+    if (!repo) { showStatus('Enter an image name first (e.g. nginx:latest)', 'warning'); return; }
+    const btn = document.getElementById('pull-image-btn');
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">hourglass_empty</span> Pulling...';
+    btn.disabled = true;
+    try {
+      const r = await fetch(`${BACKEND()}/api/images/pull`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repository: repo })
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ detail: r.statusText }));
+        throw new Error(err?.detail || r.statusText);
+      }
+      const data = await r.json();
+      showStatus(`Pulled ${data.tags?.[0] || repo} successfully (${data.id})`, 'success');
+      if (input) input.value = '';
+      await loadImages();
+    } catch (e) {
+      showStatus(`Pull failed: ${e.message}`, 'error');
+    } finally {
+      btn.innerHTML = origHTML;
+      btn.disabled = false;
+    }
+  });
+
+  // Prune dangling images
+  document.getElementById('prune-images-btn')?.addEventListener('click', async () => {
+    if (!confirm('Remove all dangling (untagged) images? This frees up disk space.')) return;
+    const btn = document.getElementById('prune-images-btn');
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">hourglass_empty</span> Pruning...';
+    btn.disabled = true;
+    try {
+      const r = await fetch(`${BACKEND()}/api/images/prune`, { method: 'POST' });
+      if (!r.ok) throw new Error(await r.text());
+      const data = await r.json();
+      showStatus(`Pruned ${data.deleted?.length || 0} images · freed ${data.spaceReclaimedMB} MB`, 'success');
+      await loadImages();
+    } catch (e) {
+      showStatus(`Prune failed: ${e.message}`, 'error');
+    } finally {
+      btn.innerHTML = origHTML;
+      btn.disabled = false;
+    }
+  });
+
+  // Refresh button
+  document.getElementById('images-refresh-btn')?.addEventListener('click', () => {
+    const icon = document.querySelector('#images-refresh-btn span');
+    if (icon) { icon.classList.add('animate-spin'); setTimeout(() => icon.classList.remove('animate-spin'), 600); }
+    loadImages();
+  });
+
+  // Listen for tab activation
+  window.addEventListener('showImagesPanel', loadImages);
+
+  loadImages();
+</script>
+
+<style>
+  .animate-spin { animation: img-spin 0.7s linear infinite; }
+  @keyframes img-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>

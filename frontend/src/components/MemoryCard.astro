@@ -1,0 +1,126 @@
+---
+// MemoryCard.astro — Real RAM metrics + sparkline history chart
+---
+
+<div id="mem-card-container" class="ios-glass p-4 rounded-[24px] flex flex-col justify-between aspect-square w-full relative overflow-hidden transition-all duration-300 active:scale-98">
+  <!-- Widget Top -->
+  <div class="flex justify-between items-start w-full">
+    <div id="mem-icon-bg" class="w-9 h-9 rounded-full bg-[#00d4ff]/10 flex items-center justify-center text-[#00d4ff] transition-all">
+      <span class="material-symbols-outlined text-lg">storage</span>
+    </div>
+    <span class="font-mono text-[10px] uppercase font-bold tracking-wider opacity-70" style="color:var(--pb-text-sub)">RAM</span>
+  </div>
+
+  <!-- Main Metric -->
+  <div class="my-2 flex flex-col items-start gap-1">
+    <span id="mem-percent-text" class="font-mono text-3xl font-extrabold text-[#00d4ff] tracking-tight transition-all">--%</span>
+    <div class="w-full bg-black/20 h-[4px] rounded-full overflow-hidden">
+      <div id="mem-progress-bar" class="bg-[#00d4ff] h-full progress-bar-anim rounded-full transition-all" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Sparkline -->
+  <canvas id="mem-sparkline" height="36" class="w-full rounded-[6px] opacity-80"></canvas>
+
+  <!-- Bottom -->
+  <div class="w-full flex justify-between items-center text-[11px] font-mono opacity-80 mt-1" style="color:var(--pb-text-sub)">
+    <span id="mem-status-text">Connecting...</span>
+    <span id="mem-threshold-text" class="text-[#34c759] font-medium">—</span>
+  </div>
+
+  <!-- Error overlay -->
+  <div id="mem-error-overlay" class="hidden absolute inset-0 backdrop-blur-sm flex flex-col items-center justify-center gap-2 p-4 rounded-[24px]" style="background:rgba(13,15,19,0.85)">
+    <span class="material-symbols-outlined text-[#ff3b30] text-2xl">error</span>
+    <span id="mem-error-text" class="font-mono text-[9px] text-[#ff3b30] text-center leading-relaxed"></span>
+  </div>
+</div>
+
+<script>
+  const MEM_HISTORY = [];
+  const MAX_POINTS = 30;
+
+  function drawSparkline(canvasEl, data, color = '#00d4ff') {
+    if (!canvasEl || data.length < 2) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvasEl.offsetWidth;
+    const h = canvasEl.height;
+    canvasEl.width = w * dpr;
+    canvasEl.height = h * dpr;
+    const ctx = canvasEl.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+    const pts = data.map((v, i) => ({
+      x: (i / (data.length - 1)) * w,
+      y: h - (v / 100) * (h - 4) - 2
+    }));
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, color + '33');
+    grad.addColorStop(1, color + '00');
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, h);
+    pts.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(pts[pts.length-1].x, h);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.beginPath();
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+
+  async function updateMemory() {
+    const errorOverlay = document.getElementById('mem-error-overlay');
+    const errorText = document.getElementById('mem-error-text');
+    const percentEl = document.getElementById('mem-percent-text');
+    const barEl = document.getElementById('mem-progress-bar');
+    const statusEl = document.getElementById('mem-status-text');
+    const thresholdEl = document.getElementById('mem-threshold-text');
+    const iconBg = document.getElementById('mem-icon-bg');
+    const canvas = document.getElementById('mem-sparkline');
+
+    try {
+      const backendUrl = localStorage.getItem('pulseboard_backend_url') || 'http://localhost:8000';
+      const res = await fetch(`${backendUrl}/api/system-metrics`);
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(`HTTP ${res.status}: ${e?.detail?.reason || e?.detail || res.statusText}`);
+      }
+      const data = await res.json();
+
+      if (errorOverlay) errorOverlay.classList.add('hidden');
+      if (percentEl) percentEl.textContent = `${data.memory}%`;
+      if (barEl) barEl.style.width = `${data.memory}%`;
+      if (statusEl) statusEl.textContent = data.memText || 'Active';
+
+      const isWarning = data.memory >= 85;
+      const color = isWarning ? '#ff3b30' : '#00d4ff';
+      if (percentEl) percentEl.style.color = color;
+      if (barEl) barEl.style.background = color;
+      if (thresholdEl) { thresholdEl.textContent = isWarning ? 'Warning' : 'Healthy'; thresholdEl.style.color = isWarning ? '#ff3b30' : '#34c759'; }
+      if (iconBg) iconBg.style.color = color;
+
+      MEM_HISTORY.push(data.memory);
+      if (MEM_HISTORY.length > MAX_POINTS) MEM_HISTORY.shift();
+      drawSparkline(canvas, MEM_HISTORY, color);
+
+      const threshold = parseInt(localStorage.getItem('pb_alert_mem') || '85');
+      if (data.memory >= threshold) window.dispatchEvent(new CustomEvent('pb-alert', { detail: { metric: 'RAM', value: data.memory, threshold } }));
+
+    } catch (e) {
+      if (errorOverlay) errorOverlay.classList.remove('hidden');
+      if (errorText) errorText.textContent = e.message;
+      if (percentEl) percentEl.textContent = 'ERR';
+      if (barEl) barEl.style.width = '0%';
+      if (thresholdEl) { thresholdEl.textContent = '—'; thresholdEl.style.color = ''; }
+      console.error('[MemoryCard]', e.message);
+    }
+  }
+
+  updateMemory();
+  setInterval(updateMemory, 5000);
+  window.addEventListener('storage', updateMemory);
+  window.addEventListener('refreshMetrics', updateMemory);
+</script>

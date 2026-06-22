@@ -1,0 +1,89 @@
+---
+// NetworkCard.astro — Real network I/O from psutil
+---
+
+<div class="ios-glass p-4 rounded-[24px] flex flex-col gap-3 w-full relative overflow-hidden transition-all">
+  <!-- Header -->
+  <div class="flex justify-between items-start w-full">
+    <div class="w-9 h-9 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
+      <span class="material-symbols-outlined text-lg">network_node</span>
+    </div>
+    <span class="font-mono text-[10px] uppercase font-bold tracking-wider text-[#bbc9cf] opacity-70">NETWORK</span>
+  </div>
+
+  <!-- Metrics -->
+  <div class="flex flex-col gap-2 mt-1">
+    <!-- Upload -->
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-1.5 text-[#bbc9cf]/60">
+        <span class="material-symbols-outlined text-sm text-purple-400">upload</span>
+        <span class="font-mono text-[10px] uppercase tracking-wider">Sent</span>
+      </div>
+      <span id="net-sent" class="font-mono text-sm font-bold text-purple-300">— MB</span>
+    </div>
+    <!-- Divider -->
+    <div class="w-full h-px bg-white/[0.04]"></div>
+    <!-- Download -->
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-1.5 text-[#bbc9cf]/60">
+        <span class="material-symbols-outlined text-sm text-[#00d4ff]">download</span>
+        <span class="font-mono text-[10px] uppercase tracking-wider">Recv</span>
+      </div>
+      <span id="net-recv" class="font-mono text-sm font-bold text-[#00d4ff]">— MB</span>
+    </div>
+  </div>
+
+  <!-- Bottom: system uptime + processes -->
+  <div class="flex items-center justify-between pt-1 border-t border-white/[0.04] mt-auto">
+    <div class="flex flex-col gap-0.5">
+      <span class="font-mono text-[9px] text-[#bbc9cf]/40 uppercase tracking-wider">Uptime</span>
+      <span id="sys-uptime" class="font-mono text-xs text-[#bbc9cf]/80 font-semibold">—</span>
+    </div>
+    <div class="flex flex-col gap-0.5 items-end">
+      <span class="font-mono text-[9px] text-[#bbc9cf]/40 uppercase tracking-wider">Processes</span>
+      <span id="sys-processes" class="font-mono text-xs text-[#bbc9cf]/80 font-semibold">—</span>
+    </div>
+  </div>
+
+  <!-- Error overlay -->
+  <div id="net-error-overlay" class="hidden absolute inset-0 bg-[#0d0f13]/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2 p-4 rounded-[24px]">
+    <span class="material-symbols-outlined text-[#ff3b30] text-2xl">error</span>
+    <span id="net-error-text" class="font-mono text-[9px] text-[#ff3b30] text-center leading-relaxed"></span>
+  </div>
+</div>
+
+<script>
+  async function updateNetwork() {
+    const sentEl = document.getElementById('net-sent');
+    const recvEl = document.getElementById('net-recv');
+    const uptimeEl = document.getElementById('sys-uptime');
+    const procEl = document.getElementById('sys-processes');
+    const errorOverlay = document.getElementById('net-error-overlay');
+    const errorText = document.getElementById('net-error-text');
+
+    try {
+      const backendUrl = localStorage.getItem('pulseboard_backend_url') || 'http://localhost:8000';
+      const res = await fetch(`${backendUrl}/api/system-metrics`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(`HTTP ${res.status}: ${errData?.detail?.reason || errData?.detail || res.statusText}`);
+      }
+      const data = await res.json();
+
+      if (errorOverlay) errorOverlay.classList.add('hidden');
+      if (sentEl) sentEl.textContent = `${data.netSentMB} MB`;
+      if (recvEl) recvEl.textContent = `${data.netRecvMB} MB`;
+      if (uptimeEl) uptimeEl.textContent = data.uptime || '—';
+      if (procEl) procEl.textContent = data.processCount ? `${data.processCount}` : '—';
+    } catch (e) {
+      if (errorOverlay) errorOverlay.classList.remove('hidden');
+      if (errorText) errorText.textContent = e.message;
+      console.error('[NetworkCard]', e.message);
+    }
+  }
+
+  updateNetwork();
+  setInterval(updateNetwork, 5000);
+  window.addEventListener('storage', updateNetwork);
+  window.addEventListener('refreshMetrics', updateNetwork);
+</script>

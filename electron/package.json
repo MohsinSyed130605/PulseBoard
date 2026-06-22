@@ -1,0 +1,33 @@
+{
+  "name": "pulseboard-desktop",
+  "version": "3.0.0",
+  "description": "PulseBoard — Self-Hosted DevOps Control Center (Desktop App)",
+  "main": "main.js",
+  "author": "PulseBoard",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.pulseboard.desktop",
+    "productName": "PulseBoard",
+    "directories": { "output": "dist" },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      { "from": "../frontend/dist", "to": "frontend-dist" }
+    ],
+    "win":   { "target": "nsis", "icon": "../frontend/public/favicon.svg" },
+    "mac":   { "target": "dmg",  "icon": "../frontend/public/favicon.svg" },
+    "linux": { "target": ["AppImage", "deb"] }
+  }
+}

@@ -1,0 +1,704 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import CpuCard from '../components/CpuCard.astro';
+import MemoryCard from '../components/MemoryCard.astro';
+import DiskCard from '../components/DiskCard.astro';
+import NetworkCard from '../components/NetworkCard.astro';
+import DockerStatus from '../components/DockerStatus.astro';
+import ActivityFeed from '../components/ActivityFeed.astro';
+import ImagesPanel from '../components/ImagesPanel.astro';
+---
+
+<DashboardLayout>
+  <div class="w-screen h-screen flex flex-col overflow-hidden select-none relative z-10">
+    
+    <!-- Drag Titlebar (Visible in Electron on non-Mac platforms) -->
+    <div id="electron-titlebar" class="w-full h-9 flex justify-between items-center px-5 shrink-0 z-50 hidden border-b" style="-webkit-app-region: drag; background: rgba(7, 7, 8, 0.4); border-color: var(--pb-border); backdrop-filter: blur(10px);">
+      <div class="flex items-center gap-2">
+        <div class="w-5 h-5 rounded-md bg-gradient-to-br from-[#00d4ff] to-[#0080aa] flex items-center justify-center text-black shadow-md shadow-[#00d4ff]/10">
+          <span class="material-symbols-outlined text-[11px] font-bold">dashboard</span>
+        </div>
+        <span class="text-[10px] font-extrabold tracking-widest uppercase opacity-60" style="color:var(--pb-text)">PulseBoard</span>
+      </div>
+      
+      <!-- Windows/Linux style control buttons -->
+      <div class="flex items-center gap-1 shrink-0" style="-webkit-app-region: no-drag;">
+        <button id="btn-win-minimize" title="Minimize" class="w-7 h-7 rounded-[5px] flex items-center justify-center hover:bg-white/10 active:scale-95 border-0 bg-transparent transition-all cursor-pointer" style="color:var(--pb-text-sub)">
+          <span class="material-symbols-outlined text-sm">minimize</span>
+        </button>
+        <button id="btn-win-maximize" title="Maximize" class="w-7 h-7 rounded-[5px] flex items-center justify-center hover:bg-white/10 active:scale-95 border-0 bg-transparent transition-all cursor-pointer" style="color:var(--pb-text-sub)">
+          <span id="maximize-icon" class="material-symbols-outlined text-sm">crop_square</span>
+        </button>
+        <button id="btn-win-close" title="Close" class="w-7 h-7 rounded-[5px] flex items-center justify-center hover:bg-red-500/20 active:scale-95 border-0 bg-transparent transition-all cursor-pointer" style="color:var(--pb-text-sub)">
+          <span class="material-symbols-outlined text-sm text-red-400">close</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Container -->
+    <div id="main-layout-container" class="flex-1 flex p-4 gap-4 overflow-hidden min-h-0">
+
+    <!-- ═══ LEFT SIDEBAR ═══ -->
+    <aside class="w-60 h-full glass-panel rounded-[24px] flex flex-col justify-between p-5 shrink-0 z-20">
+
+      <div class="flex flex-col gap-6">
+        <!-- Logo -->
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[#00d4ff] to-[#0080aa] flex items-center justify-center text-black shadow-lg shadow-[#00d4ff]/20">
+            <span class="material-symbols-outlined text-xl font-bold">dashboard</span>
+          </div>
+          <div>
+            <h1 class="text-base font-extrabold tracking-tight leading-none" style="color:var(--pb-text)">PulseBoard</h1>
+            <span class="text-[9px] font-mono opacity-40 uppercase tracking-widest mt-0.5 block" style="color:var(--pb-text-sub)">Control Center</span>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex flex-col gap-2">
+          <button id="tab-btn-dashboard" class="btn-skeuo btn-skeuo-active w-full py-3 px-4 rounded-[12px] flex items-center gap-3 font-bold text-xs uppercase tracking-wider cursor-pointer">
+            <span class="material-symbols-outlined text-base">grid_view</span>
+            Dashboard
+            <span class="ml-auto font-mono text-[9px] opacity-40">1</span>
+          </button>
+
+          <button id="tab-btn-github" class="btn-skeuo w-full py-3 px-4 rounded-[12px] flex items-center gap-3 font-bold text-xs uppercase tracking-wider cursor-pointer">
+            <span class="material-symbols-outlined text-base">timeline</span>
+            Activity Feed
+            <span class="ml-auto font-mono text-[9px] opacity-40">2</span>
+          </button>
+
+          <button id="tab-btn-images" class="btn-skeuo w-full py-3 px-4 rounded-[12px] flex items-center gap-3 font-bold text-xs uppercase tracking-wider cursor-pointer">
+            <span class="material-symbols-outlined text-base">inventory_2</span>
+            Images
+            <span class="ml-auto font-mono text-[9px] opacity-40">3</span>
+          </button>
+
+          <button id="tab-btn-settings" class="btn-skeuo w-full py-3 px-4 rounded-[12px] flex items-center gap-3 font-bold text-xs uppercase tracking-wider cursor-pointer">
+            <span class="material-symbols-outlined text-base">settings</span>
+            Setup Config
+            <span class="ml-auto font-mono text-[9px] opacity-40">4</span>
+          </button>
+        </nav>
+
+        <!-- Keyboard shortcut hints -->
+        <div class="flex flex-col gap-1 pt-2 border-t" style="border-color:var(--pb-border)">
+          <p class="font-mono text-[9px] uppercase tracking-wider opacity-30 mb-1" style="color:var(--pb-text-sub)">Shortcuts</p>
+          <div class="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[9px] opacity-50" style="color:var(--pb-text-sub)">
+            <span><kbd class="opacity-70 bg-white/10 px-1 rounded">R</kbd> Refresh</span>
+            <span><kbd class="opacity-70 bg-white/10 px-1 rounded">T</kbd> Theme</span>
+            <span><kbd class="opacity-70 bg-white/10 px-1 rounded">1-4</kbd> Tabs</span>
+            <span><kbd class="opacity-70 bg-white/10 px-1 rounded">Esc</kbd> Close</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar footer -->
+      <div class="flex flex-col gap-2 pt-3 border-t" style="border-color:var(--pb-border)">
+        <div class="flex items-center justify-between text-[10px] font-mono opacity-60" style="color:var(--pb-text-sub)">
+          <span>HOST DAEMON</span>
+          <div class="flex items-center gap-1.5">
+            <div id="connection-status-pip" class="status-pip-orange"></div>
+            <span id="connection-status-text">OFFLINE</span>
+          </div>
+        </div>
+        <p class="text-[9px] font-mono opacity-30 leading-normal" style="color:var(--pb-text-sub)">v3.0-Desktop · SQLite</p>
+      </div>
+    </aside>
+
+    <!-- ═══ MAIN CONTENT ═══ -->
+    <main class="flex-1 h-full flex flex-col gap-4 overflow-hidden min-w-0">
+
+      <!-- TOP HEADER BAR -->
+      <header class="h-14 w-full glass-panel rounded-[18px] flex justify-between items-center px-5 shrink-0 z-20">
+        <h2 id="active-panel-title" class="text-sm font-extrabold tracking-tight uppercase" style="color:var(--pb-text)">Dashboard</h2>
+
+        <div class="flex items-center gap-4">
+          <!-- Clock -->
+          <div class="flex items-center gap-2 font-mono text-xs border-r pr-4 opacity-60" style="border-color:var(--pb-border); color:var(--pb-text-sub)">
+            <span class="material-symbols-outlined text-sm">schedule</span>
+            <span id="desktop-time">00:00:00 AM</span>
+          </div>
+
+          <!-- Platform badge -->
+          <div class="hidden sm:flex items-center gap-2 text-[11px] font-mono opacity-50" style="color:var(--pb-text-sub)">
+            <span>PLATFORM:</span>
+            <span class="font-bold px-2 py-1 rounded-[6px] border text-xs" style="color:var(--pb-text); border-color:var(--pb-border); background:rgba(255,255,255,0.04)">DESKTOP AGNOSTIC</span>
+          </div>
+
+          <!-- Theme toggle -->
+          <button id="theme-toggle-btn" title="Toggle dark / light mode (T)" class="w-8 h-8 rounded-[8px] flex items-center justify-center cursor-pointer transition-all hover:bg-white/10 active:scale-90 border-0 bg-transparent" style="color:var(--pb-text-sub)">
+            <span id="theme-toggle-icon" class="material-symbols-outlined text-lg">dark_mode</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- SCROLLABLE TAB PANELS -->
+      <div class="flex-1 overflow-y-auto relative min-h-0 pb-2">
+
+        <!-- PANEL 1: DASHBOARD -->
+        <div id="panel-dashboard" class="w-full flex flex-col gap-4 transition-all duration-300">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+            <CpuCard />
+            <MemoryCard />
+            <DiskCard />
+            <NetworkCard />
+          </div>
+          <div class="w-full">
+            <DockerStatus />
+          </div>
+        </div>
+
+        <!-- PANEL 2: ACTIVITY FEED -->
+        <div id="panel-github" class="w-full hidden transition-all duration-300">
+          <ActivityFeed />
+        </div>
+
+        <!-- PANEL 3: IMAGES -->
+        <div id="panel-images" class="w-full flex flex-col gap-4 hidden transition-all duration-300">
+          <ImagesPanel />
+        </div>
+
+        <!-- PANEL 4: SETUP CONFIG -->
+        <div id="panel-settings" class="w-full flex flex-col gap-5 hidden transition-all duration-300 max-w-2xl">
+
+          <!-- Connection & GitHub settings -->
+          <div class="glass-panel p-5 rounded-[22px] flex flex-col gap-5">
+            <div class="flex items-center justify-between border-b pb-4" style="border-color:var(--pb-border)">
+              <div>
+                <h3 class="text-sm font-bold uppercase font-mono tracking-wider" style="color:var(--pb-text)">Telemetry Configuration</h3>
+                <p class="text-[11px] font-mono mt-0.5 opacity-60" style="color:var(--pb-text-sub)">API endpoints and repository targeting</p>
+              </div>
+              <div class="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400 border border-orange-500/20">
+                <span class="material-symbols-outlined text-lg">settings</span>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-bold font-mono uppercase tracking-wider opacity-70" style="color:var(--pb-text-sub)">API Server Endpoint URL</label>
+                <input id="input-backend-url" type="text" class="w-full rounded-[10px] p-3 font-mono text-xs focus:outline-none border" placeholder="http://localhost:8000" style="background:var(--pb-input); color:var(--pb-text); border-color:var(--pb-border);" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-bold font-mono uppercase tracking-wider opacity-70" style="color:var(--pb-text-sub)">Docker Host Daemon URL (Optional — leave blank for local socket)</label>
+                <input id="input-docker-host" type="text" class="w-full rounded-[10px] p-3 font-mono text-xs focus:outline-none border" placeholder="e.g. tcp://192.168.1.100:2375 or local" style="background:var(--pb-input); color:var(--pb-text); border-color:var(--pb-border);" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-bold font-mono uppercase tracking-wider opacity-70" style="color:var(--pb-text-sub)">Monitor GitHub Repositories (comma-separated links or owner/repo)</label>
+                <input id="input-github-repo" type="text" class="w-full rounded-[10px] p-3 font-mono text-xs focus:outline-none border" placeholder="https://github.com/withastro/astro, sveltejs/svelte" style="background:var(--pb-input); color:var(--pb-text); border-color:var(--pb-border);" />
+              </div>
+              <div class="flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                  <label class="text-xs font-bold font-mono uppercase tracking-wider opacity-70" style="color:var(--pb-text-sub)">GitHub Personal Access Token <span class="normal-case opacity-50">(optional — raises API limit to 5000/hr)</span></label>
+                  <button id="btn-clear-token" type="button" title="Remove token from local storage" class="font-mono text-[9px] text-[#ff3b30]/60 hover:text-[#ff3b30] flex items-center gap-1 transition-colors cursor-pointer border-0 bg-transparent">
+                    <span class="material-symbols-outlined text-xs">delete</span>
+                    Clear
+                  </button>
+                </div>
+                <div class="relative flex items-center">
+                  <input id="input-github-token" type="password" autocomplete="off" spellcheck="false" class="w-full rounded-[10px] p-3 pr-10 font-mono text-xs focus:outline-none border" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxx" style="background:var(--pb-input); color:var(--pb-text); border-color:var(--pb-border);" />
+                  <button id="btn-token-visibility" type="button" title="Show / hide token" class="absolute right-2.5 text-[#bbc9cf]/40 hover:text-[#bbc9cf] transition-colors cursor-pointer border-0 bg-transparent flex items-center">
+                    <span id="token-vis-icon" class="material-symbols-outlined text-base">visibility_off</span>
+                  </button>
+                </div>
+                <!-- Security advisory -->
+                <div class="p-2.5 rounded-[10px] flex gap-2 items-start" style="background:rgba(255,149,0,0.06); border:1px solid rgba(255,149,0,0.15)">
+                  <span class="material-symbols-outlined text-[#ff9500] text-sm shrink-0 mt-0.5">shield</span>
+                  <p class="font-mono text-[9px] leading-relaxed opacity-80" style="color:var(--pb-text-sub)">
+                    <strong style="color:#ff9500">Minimal scope recommended.</strong> Create a fine-grained token with <em>Contents: Read-only</em> (public repos) or <em>public_repo</em> classic scope. Never use a full-access token. Token is stored in browser <code>localStorage</code> — not sent to the backend.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button id="save-settings-btn" class="btn-skeuo-cyan w-fit py-3 px-5 rounded-[12px] font-bold text-xs uppercase tracking-widest cursor-pointer flex items-center gap-2">
+              <span class="material-symbols-outlined text-sm font-bold">save</span>
+              Save configuration
+            </button>
+          </div>
+
+          <!-- Alert thresholds -->
+          <div class="glass-panel p-5 rounded-[22px] flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b pb-4" style="border-color:var(--pb-border)">
+              <div>
+                <h3 class="text-sm font-bold uppercase font-mono tracking-wider" style="color:var(--pb-text)">Alert Thresholds</h3>
+                <p class="text-[11px] font-mono mt-0.5 opacity-60" style="color:var(--pb-text-sub)">Browser + toast notification when exceeded</p>
+              </div>
+              <div class="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400 border border-red-500/20">
+                <span class="material-symbols-outlined text-lg">notifications_active</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-[10px] font-bold font-mono uppercase tracking-wider opacity-60" style="color:var(--pb-text-sub)">CPU %</label>
+                <input id="alert-cpu-threshold" type="number" min="1" max="100" class="w-full rounded-[10px] p-3 font-mono text-xs focus:outline-none border text-[#00d4ff]" placeholder="80" style="background:var(--pb-input); border-color:var(--pb-border);" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-[10px] font-bold font-mono uppercase tracking-wider opacity-60" style="color:var(--pb-text-sub)">RAM %</label>
+                <input id="alert-mem-threshold" type="number" min="1" max="100" class="w-full rounded-[10px] p-3 font-mono text-xs focus:outline-none border text-[#34c759]" placeholder="85" style="background:var(--pb-input); border-color:var(--pb-border);" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-[10px] font-bold font-mono uppercase tracking-wider opacity-60" style="color:var(--pb-text-sub)">Disk %</label>
+                <input id="alert-disk-threshold" type="number" min="1" max="100" class="w-full rounded-[10px] p-3 font-mono text-xs focus:outline-none border text-[#ff9500]" placeholder="90" style="background:var(--pb-input); border-color:var(--pb-border);" />
+              </div>
+            </div>
+
+            <div class="p-3 rounded-[12px] flex gap-3 items-start" style="background:rgba(0,212,255,0.05); border:1px solid rgba(0,212,255,0.1)">
+              <span class="material-symbols-outlined text-[#00d4ff] text-lg shrink-0">info</span>
+              <p class="font-mono text-[10px] opacity-70 leading-relaxed" style="color:var(--pb-text-sub)">Thresholds are saved locally. When a metric exceeds its threshold, you'll see an in-app toast and a browser OS notification (if permissions are granted).</p>
+            </div>
+
+            <button id="save-alerts-btn" class="btn-skeuo-cyan w-fit py-3 px-5 rounded-[12px] font-bold text-xs uppercase tracking-widest cursor-pointer flex items-center gap-2">
+              <span class="material-symbols-outlined text-sm font-bold">notifications</span>
+              Save thresholds
+            </button>
+          </div>
+
+          <!-- Disk Space & Optimization -->
+          <div class="glass-panel p-5 rounded-[22px] flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b pb-4" style="border-color:var(--pb-border)">
+              <div>
+                <h3 class="text-sm font-bold uppercase font-mono tracking-wider" style="color:var(--pb-text)">Disk Optimization</h3>
+                <p class="text-[11px] font-mono mt-0.5 opacity-60" style="color:var(--pb-text-sub)">Clean build cache, dangling layers, and unused containers</p>
+              </div>
+              <div class="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 border border-cyan-500/20">
+                <span class="material-symbols-outlined text-lg">cleaning_services</span>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-[12px] flex flex-col gap-2" style="background:rgba(255,255,255,0.02); border:1px solid var(--pb-border)">
+              <div class="flex justify-between items-center text-xs font-mono">
+                <span class="opacity-70" style="color:var(--pb-text-sub)">Docker Prune Operations</span>
+                <span class="text-[10px] text-[#00d4ff]">RECLAIM SPACE</span>
+              </div>
+              <p class="font-mono text-[9px] opacity-60 leading-relaxed" style="color:var(--pb-text-sub)">Docker stores build cache, old logs, and unused images that consume gigabytes of disk space. Click below to clean them up. Note: This will not delete your active running containers.</p>
+            </div>
+
+            <div class="flex gap-3">
+              <button id="btn-prune-docker" class="btn-skeuo-cyan w-fit py-3 px-5 rounded-[12px] font-bold text-xs uppercase tracking-widest cursor-pointer flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm font-bold">delete_sweep</span>
+                Prune Docker System
+              </button>
+              <button id="btn-clean-local-cache" class="btn-skeuo w-fit py-3 px-5 rounded-[12px] font-bold text-xs uppercase tracking-widest cursor-pointer flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm font-bold">mop</span>
+                Clean Temp Files
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </main>
+    </div>
+  </div>
+</DashboardLayout>
+
+<script>
+  // ══════════════════════════════════════════════════════════════
+  // 1. Clock
+  // ══════════════════════════════════════════════════════════════
+  function startClock() {
+    const el = document.getElementById('desktop-time');
+    if (!el) return;
+    const tick = () => {
+      const now = new Date();
+      let h = now.getHours();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      const m = now.getMinutes().toString().padStart(2,'0');
+      const s = now.getSeconds().toString().padStart(2,'0');
+      el.textContent = `${h}:${m}:${s} ${ampm}`;
+    };
+    tick();
+    setInterval(tick, 1000);
+  }
+  startClock();
+
+  // ══════════════════════════════════════════════════════════════
+  // 2. Tab navigation
+  // ══════════════════════════════════════════════════════════════
+  const PANELS = {
+    dashboard: document.getElementById('panel-dashboard'),
+    github:    document.getElementById('panel-github'),
+    images:    document.getElementById('panel-images'),
+    settings:  document.getElementById('panel-settings'),
+  };
+  const BTNS = {
+    dashboard: document.getElementById('tab-btn-dashboard'),
+    github:    document.getElementById('tab-btn-github'),
+    images:    document.getElementById('tab-btn-images'),
+    settings:  document.getElementById('tab-btn-settings'),
+  };
+  const LABELS = { dashboard:'Dashboard', github:'Activity Feed', images:'Images', settings:'Setup Config' };
+  const titleEl = document.getElementById('active-panel-title');
+
+  function switchTab(tab) {
+    Object.keys(PANELS).forEach(k => {
+      PANELS[k]?.classList.toggle('hidden', k !== tab);
+      if (k === tab) BTNS[k]?.classList.add('btn-skeuo-active');
+      else BTNS[k]?.classList.remove('btn-skeuo-active');
+    });
+    if (titleEl) titleEl.textContent = LABELS[tab] || 'Dashboard';
+    if (tab === 'images') window.dispatchEvent(new Event('showImagesPanel'));
+  }
+
+  Object.keys(BTNS).forEach(k => BTNS[k]?.addEventListener('click', () => switchTab(k)));
+
+  // ══════════════════════════════════════════════════════════════
+  // 3. Dark / Light theme toggle
+  // ══════════════════════════════════════════════════════════════
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('pb_theme', theme);
+    const icon = document.getElementById('theme-toggle-icon');
+    if (icon) icon.textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
+  }
+
+  const themeBtn = document.getElementById('theme-toggle-btn');
+  themeBtn?.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  });
+
+  // Restore saved theme on load
+  const savedTheme = localStorage.getItem('pb_theme') || 'dark';
+  applyTheme(savedTheme);
+
+  // ══════════════════════════════════════════════════════════════
+  // 4. Keyboard shortcuts
+  // ══════════════════════════════════════════════════════════════
+  document.addEventListener('keydown', (e) => {
+    // Don't fire when user is typing in an input
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+    switch (e.key.toUpperCase()) {
+      case '1': case 'D': switchTab('dashboard'); break;
+      case '2': case 'A': switchTab('github'); break;
+      case '3': case 'I': switchTab('images'); break;
+      case '4': case 'S': switchTab('settings'); break;
+      case 'R':
+        window.dispatchEvent(new Event('refreshMetrics'));
+        window.dispatchEvent(new Event('refreshContainers'));
+        window.dispatchEvent(new Event('refreshGithub'));
+        showToast('Refreshing all data...', 'info');
+        break;
+      case 'T': {
+        const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+        applyTheme(cur === 'dark' ? 'light' : 'dark');
+        break;
+      }
+      case 'ESCAPE':
+        document.getElementById('log-modal')?.classList.add('hidden');
+        break;
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // 5. Toast notification system
+  // ══════════════════════════════════════════════════════════════
+  function showToast(message, type = 'info', duration = 5000) {
+    const container = document.getElementById('pb-toast-container');
+    if (!container) return;
+
+    const iconMap = { info: 'info', success: 'check_circle', warning: 'warning', error: 'error' };
+    const colorMap = { info: '#00d4ff', success: '#34c759', warning: '#ff9500', error: '#ff3b30' };
+
+    const toast = document.createElement('div');
+    toast.className = `pb-toast ${type}`;
+    toast.innerHTML = `
+      <span class="material-symbols-outlined text-base shrink-0" style="color:${colorMap[type]}">${iconMap[type]}</span>
+      <span style="color:var(--pb-text)">${message}</span>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.classList.add('dismissing');
+      setTimeout(() => toast.remove(), 250);
+    }, duration);
+  }
+
+  // Make showToast globally accessible (components dispatch events, index handles UI)
+  (window as any).pbShowToast = showToast;
+
+  // ══════════════════════════════════════════════════════════════
+  // 6. Alert threshold system — listens for pb-alert from cards
+  // ══════════════════════════════════════════════════════════════
+  const alertCooldowns = new Map(); // prevent spam
+
+  window.addEventListener('pb-alert', (e: any) => {
+    const { metric, value, threshold } = e.detail;
+    const key = metric;
+    const now = Date.now();
+    // Only alert once every 2 minutes per metric
+    if (alertCooldowns.has(key) && now - alertCooldowns.get(key) < 120_000) return;
+    alertCooldowns.set(key, now);
+
+    const msg = `⚠️ ${metric} at ${value}% — threshold ${threshold}% exceeded`;
+    showToast(msg, 'warning', 8000);
+
+    // Browser OS notification
+    if ('Notification' in window) {
+      Notification.requestPermission().then(perm => {
+        if (perm === 'granted') {
+          new Notification('PulseBoard Alert', { body: `${metric} is at ${value}% (threshold: ${threshold}%)`, icon: '/favicon.svg' });
+        }
+      });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // 7. Settings load, ping & save
+  // ══════════════════════════════════════════════════════════════
+  // Helper to parse repo links/inputs (supports multiple repos separated by commas)
+  function parseRepoInput(input) {
+    return input.split(',')
+      .map(r => {
+        let val = r.trim();
+        if (!val) return null;
+        // Strip protocols and domain names (e.g., https://github.com/owner/repo -> owner/repo)
+        val = val.replace(/^(https?:\/\/)?(www\.)?github\.com\//i, '');
+        // Strip subpaths like /issues or /pulls
+        const parts = val.split('/');
+        if (parts.length >= 2) {
+          return `${parts[0]}/${parts[1]}`;
+        }
+        return val;
+      })
+      .filter(Boolean)
+      .join(',');
+  }
+
+  let settingsLoaded = false;
+
+  async function loadSettingsAndPing() {
+    const inputBackend = document.getElementById('input-backend-url') as HTMLInputElement;
+    const inputDockerHost = document.getElementById('input-docker-host') as HTMLInputElement;
+    const inputRepo    = document.getElementById('input-github-repo') as HTMLInputElement;
+    const inputToken   = document.getElementById('input-github-token') as HTMLInputElement;
+    const pip  = document.getElementById('connection-status-pip');
+    const text = document.getElementById('connection-status-text');
+
+    const localBackend = localStorage.getItem('pulseboard_backend_url') || 'http://localhost:8000';
+    const localDockerHost = localStorage.getItem('pulseboard_docker_host') || '';
+    const localRepo    = localStorage.getItem('pulseboard_github_repo') || '';
+    const localToken   = localStorage.getItem('pulseboard_github_token') || '';
+    
+    if (!settingsLoaded) {
+      if (inputBackend) inputBackend.value = localBackend;
+      if (inputDockerHost) inputDockerHost.value = localDockerHost;
+      if (inputRepo)    inputRepo.value = localRepo;
+      if (inputToken)   inputToken.value = localToken;
+
+      // Load alert thresholds
+      const cpuThEl  = document.getElementById('alert-cpu-threshold')  as HTMLInputElement;
+      const memThEl  = document.getElementById('alert-mem-threshold')  as HTMLInputElement;
+      const diskThEl = document.getElementById('alert-disk-threshold') as HTMLInputElement;
+      if (cpuThEl)  cpuThEl.value  = localStorage.getItem('pb_alert_cpu')  || '80';
+      if (memThEl)  memThEl.value  = localStorage.getItem('pb_alert_mem')  || '85';
+      if (diskThEl) diskThEl.value = localStorage.getItem('pb_alert_disk') || '90';
+      
+      settingsLoaded = true;
+    }
+
+    try {
+      const res = await fetch(`${localBackend}/api/settings`);
+      if (res.ok) {
+        if (pip)  pip.className  = 'status-pip-green';
+        if (text) { text.textContent = 'ONLINE'; text.style.color = '#34c759'; }
+        const data = await res.json();
+        if (data.github_repo && data.github_repo !== localRepo) {
+          localStorage.setItem('pulseboard_github_repo', data.github_repo);
+          if (inputRepo && document.activeElement !== inputRepo) {
+            inputRepo.value = data.github_repo;
+          }
+        }
+        if (data.docker_host !== undefined && data.docker_host !== localDockerHost) {
+          localStorage.setItem('pulseboard_docker_host', data.docker_host);
+          if (inputDockerHost && document.activeElement !== inputDockerHost) {
+            inputDockerHost.value = data.docker_host;
+          }
+        }
+        // NOTE: github_token is not synced from backend — it's stored locally only
+        // and read from localStorage for client-side GitHub API calls.
+      } else { throw new Error(); }
+    } catch {
+      if (pip)  pip.className  = 'status-pip-red';
+      if (text) { text.textContent = 'OFFLINE'; text.style.color = '#ff3b30'; }
+    }
+  }
+
+  loadSettingsAndPing();
+  setInterval(loadSettingsAndPing, 12000);
+
+  // ── GitHub token show/hide toggle ────────────────────────────────────────────
+  document.getElementById('btn-token-visibility')?.addEventListener('click', () => {
+    const input = document.getElementById('input-github-token') as HTMLInputElement;
+    const icon = document.getElementById('token-vis-icon');
+    if (!input) return;
+    const isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+    if (icon) icon.textContent = isHidden ? 'visibility' : 'visibility_off';
+  });
+
+  // ── Clear GitHub token from localStorage ─────────────────────────────────────
+  document.getElementById('btn-clear-token')?.addEventListener('click', () => {
+    if (!confirm('Remove the GitHub token from this browser? You will need to re-enter it to use the Activity Feed with authenticated requests.')) return;
+    localStorage.removeItem('pulseboard_github_token');
+    const input = document.getElementById('input-github-token') as HTMLInputElement;
+    if (input) { input.value = ''; input.type = 'password'; }
+    const icon = document.getElementById('token-vis-icon');
+    if (icon) icon.textContent = 'visibility_off';
+    showToast('GitHub token cleared from local storage.', 'info');
+    window.dispatchEvent(new Event('refreshGithub'));
+  });
+
+  // Save connection settings
+  document.getElementById('save-settings-btn')?.addEventListener('click', async () => {
+    const inputBackend = document.getElementById('input-backend-url') as HTMLInputElement;
+    const inputDockerHost = document.getElementById('input-docker-host') as HTMLInputElement;
+    const inputRepo    = document.getElementById('input-github-repo') as HTMLInputElement;
+    const inputToken   = document.getElementById('input-github-token') as HTMLInputElement;
+    const newBackend   = inputBackend?.value.trim() || 'http://localhost:8000';
+    const newDockerHost = inputDockerHost?.value.trim() || '';
+    // Sanitize token: trim whitespace, reject anything that doesn't look like a PAT
+    const rawToken = inputToken?.value.trim() || '';
+    const newToken = rawToken;
+
+    // Validate backend URL scheme — only http/https allowed
+    if (newBackend && !newBackend.match(/^https?:\/\//)) {
+      showToast('Backend URL must start with http:// or https://', 'error');
+      return;
+    }
+
+    // Warn if token is set but doesn't match known GitHub PAT prefixes
+    if (newToken && !newToken.match(/^(ghp_|ghs_|github_pat_|gho_)/)) {
+      showToast('Token format looks unusual. GitHub PATs start with ghp_, github_pat_, etc.', 'warning');
+    }
+
+    const parsedRepo   = parseRepoInput(inputRepo?.value || '');
+
+    localStorage.setItem('pulseboard_backend_url', newBackend);
+    localStorage.setItem('pulseboard_docker_host', newDockerHost);
+    localStorage.setItem('pulseboard_github_repo', parsedRepo);
+    // Only update token in localStorage if user actually typed something
+    if (rawToken) localStorage.setItem('pulseboard_github_token', newToken);
+    if (inputRepo) inputRepo.value = parsedRepo;
+
+    window.dispatchEvent(new Event('refreshMetrics'));
+    window.dispatchEvent(new Event('refreshContainers'));
+    window.dispatchEvent(new Event('refreshGithub'));
+
+    const btn = document.getElementById('save-settings-btn');
+    const orig = btn?.innerHTML;
+    if (btn) { btn.innerHTML = '<span class="material-symbols-outlined text-sm">check</span> Saved!'; btn.classList.add('opacity-80'); }
+
+    try {
+      await fetch(`${newBackend}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          github_repo: parsedRepo, 
+          refresh_interval: '5', 
+          backend_url: newBackend,
+          docker_host: newDockerHost
+          // github_token intentionally omitted — stored in env var only
+        })
+      });
+      showToast('Settings saved & synced to backend.', 'success');
+    } catch {
+      showToast('Settings saved locally — backend sync failed.', 'warning');
+    }
+
+    setTimeout(() => { if (btn && orig) { btn.innerHTML = orig; btn.classList.remove('opacity-80'); } loadSettingsAndPing(); }, 1500);
+  });
+
+  // Save alert thresholds
+  document.getElementById('save-alerts-btn')?.addEventListener('click', () => {
+    const cpu  = (document.getElementById('alert-cpu-threshold')  as HTMLInputElement)?.value || '80';
+    const mem  = (document.getElementById('alert-mem-threshold')  as HTMLInputElement)?.value || '85';
+    const disk = (document.getElementById('alert-disk-threshold') as HTMLInputElement)?.value || '90';
+    localStorage.setItem('pb_alert_cpu', cpu);
+    localStorage.setItem('pb_alert_mem', mem);
+    localStorage.setItem('pb_alert_disk', disk);
+    showToast(`Thresholds saved: CPU ${cpu}% · RAM ${mem}% · Disk ${disk}%`, 'success');
+
+    // Pre-request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // 8. Electron Window Controls (Minimize / Maximize / Close)
+  // ══════════════════════════════════════════════════════════════
+  const isElectron = typeof window !== 'undefined' && (window as any).electron;
+  if (isElectron) {
+    const platform = (window as any).electron.platform;
+    if (platform !== 'darwin') {
+      const titlebar = document.getElementById('electron-titlebar');
+      const container = document.getElementById('main-layout-container');
+      if (titlebar) titlebar.classList.remove('hidden');
+      if (container) {
+        container.classList.remove('p-4');
+        container.classList.add('px-4', 'pb-4', 'pt-1');
+      }
+
+      document.getElementById('btn-win-minimize')?.addEventListener('click', () => {
+        (window as any).electron.minimize();
+      });
+      document.getElementById('btn-win-maximize')?.addEventListener('click', () => {
+        (window as any).electron.maximize();
+      });
+      document.getElementById('btn-win-close')?.addEventListener('click', () => {
+        (window as any).electron.close();
+      });
+
+      const maxIcon = document.getElementById('maximize-icon');
+      (window as any).electron.onWindowStateChanged((state: { isMaximized: boolean }) => {
+        if (maxIcon) {
+          maxIcon.textContent = state.isMaximized ? 'filter_none' : 'crop_square';
+        }
+      });
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 9. Disk Space & Optimization Action
+  // ══════════════════════════════════════════════════════════════
+  document.getElementById('btn-prune-docker')?.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to prune unused Docker resources? This will remove all stopped containers, unused networks, and dangling images.')) return;
+    
+    const btn = document.getElementById('btn-prune-docker');
+    const orig = btn?.innerHTML;
+    if (btn) {
+      btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">sync</span> Pruning...';
+      btn.setAttribute('disabled', 'true');
+      btn.classList.add('opacity-50');
+    }
+    
+    const backend = localStorage.getItem('pulseboard_backend_url') || 'http://localhost:8000';
+    try {
+      const res = await fetch(`${backend}/api/system/prune`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        showToast(`Prune completed! Reclaimed ${data.reclaimedMB} MB. Cleaned ${data.containers} containers, ${data.images} images, and ${data.volumes} volumes.`, 'success', 8000);
+      } else {
+        const err = await res.json();
+        showToast(`Prune failed: ${err.detail?.reason || 'Unknown error'}`, 'error');
+      }
+    } catch (e: any) {
+      showToast(`Failed to connect to backend: ${e.message}`, 'error');
+    } finally {
+      if (btn && orig) {
+        btn.innerHTML = orig;
+        btn.removeAttribute('disabled');
+        btn.classList.remove('opacity-50');
+      }
+    }
+  });
+
+  document.getElementById('btn-clean-local-cache')?.addEventListener('click', () => {
+    localStorage.removeItem('pb_alert_cooldowns');
+    showToast('Telemetry caches and local UI preferences refreshed.', 'success');
+  });
+</script>

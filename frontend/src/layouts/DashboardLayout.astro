@@ -1,0 +1,59 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "PulseBoard — DevOps Control Center",
+  description = "Self-hosted DevOps dashboard — real-time Docker containers, system metrics and GitHub activity."
+} = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+
+    <!-- Google Fonts: Outfit (UI) + JetBrains Mono (code/mono) — minimal weight set -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Material Symbols: narrowed to wght 400 only, FILL 0 only — saves ~60% vs variable axes -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap" rel="stylesheet" />
+
+    <style is:global>
+      /* Ambient background glow helpers — depend on CSS vars set in global.css */
+      .pb-glow-1 { background: var(--pb-glow-1); }
+      .pb-glow-2 { background: var(--pb-glow-2); }
+      .pb-glow-3 { background: var(--pb-glow-3); }
+    </style>
+  </head>
+  <body class="h-screen w-screen overflow-hidden text-gray-100 antialiased select-none relative">
+    <!-- Toast container — lives outside panels so z-index works everywhere -->
+    <div id="pb-toast-container"></div>
+
+    <!-- Ambient background glows -->
+    <div class="pb-glow-1 absolute top-[10%] left-[15%] w-[450px] h-[450px] rounded-full blur-[140px] pointer-events-none animate-pulse"></div>
+    <div class="pb-glow-2 absolute bottom-[15%] right-[20%] w-[500px] h-[500px] rounded-full blur-[160px] pointer-events-none animate-pulse" style="animation-delay: 3s;"></div>
+    <div class="pb-glow-3 absolute top-[40%] right-[35%] w-[350px] h-[350px] rounded-full blur-[130px] pointer-events-none animate-pulse" style="animation-delay: 1.5s;"></div>
+
+    <slot />
+
+    <script>
+      // Theme bootstrap — restore preference before first paint
+      (function() {
+        const saved = localStorage.getItem('pb_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', saved);
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,413 @@
+---
+// ActivityFeed.astro
+---
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-4 w-full h-[620px] overflow-hidden select-none">
+  
+  <!-- Left/Center Column: Live Activity Feed (2 cols) -->
+  <div class="xl:col-span-2 flex flex-col gap-3 h-full overflow-hidden ios-glass p-5 rounded-[24px]">
+    <div class="px-1 flex justify-between items-center shrink-0 border-b border-white/5 pb-3">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-[#00d4ff] text-lg">timeline</span>
+        <h3 class="font-mono text-xs font-bold tracking-wider text-[#bbc9cf] uppercase">GitHub Activity Feed</h3>
+      </div>
+      <span id="target-repo-badge" class="font-mono text-[10px] text-[#00d4ff] bg-[#00d4ff]/10 px-2 py-0.5 rounded-full">—</span>
+    </div>
+    
+    <!-- Monitored Repos tags list -->
+    <div id="monitored-repos-list" class="flex flex-wrap gap-1.5 px-1 shrink-0"></div>
+
+    <!-- Feed timeline scrollbody -->
+    <div class="flex-1 overflow-y-auto pr-1 min-h-0">
+      <div id="github-notifications-list" class="flex flex-col gap-2">
+        <!-- Loading indicator -->
+        <div class="py-24 text-center font-mono text-xs text-[#bbc9cf] animate-pulse">
+          Fetching live repository events...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Repository Explorer (1 col) -->
+  <div class="flex flex-col gap-3 h-full overflow-hidden ios-glass p-5 rounded-[24px]">
+    <div class="px-1 flex justify-between items-center shrink-0 border-b border-white/5 pb-3 gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="material-symbols-outlined text-purple-400 text-lg shrink-0">folder_open</span>
+        <h3 class="font-mono text-xs font-bold tracking-wider text-[#bbc9cf] uppercase truncate">Repo Explorer</h3>
+      </div>
+      <select id="repo-explorer-select" class="font-mono text-[9px] bg-white/[0.04] border border-white/10 rounded px-2 py-1 text-white focus:outline-none cursor-pointer shrink-0 max-w-[120px]"></select>
+    </div>
+
+    <!-- Repository Content Files List -->
+    <div class="flex-1 overflow-y-auto pr-1 min-h-0">
+      <div id="repo-files-list" class="flex flex-col gap-2">
+        <div class="py-24 text-center font-mono text-xs text-[#bbc9cf] animate-pulse">
+          Select a repository to view contents...
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let activeExplorerRepo = '';
+
+  async function updateGithubFeed() {
+    const listEl = document.getElementById('github-notifications-list');
+    const badgeEl = document.getElementById('target-repo-badge');
+    const reposListEl = document.getElementById('monitored-repos-list');
+    const explorerSelect = document.getElementById('repo-explorer-select') as HTMLSelectElement;
+    if (!listEl) return;
+
+    // Get current repositories from localStorage (supports comma-separated list of URLs or names)
+    const savedRepoInput = localStorage.getItem('pulseboard_github_repo') || '';
+    const repos = savedRepoInput.split(',').map(r => r.trim()).filter(Boolean);
+
+    if (badgeEl) {
+      badgeEl.textContent = repos.length === 1 ? repos[0] : `${repos.length} Repositories`;
+    }
+
+    // Render list of monitored repositories at the top
+    if (reposListEl) {
+      reposListEl.innerHTML = repos.map(r => `
+        <span class="font-mono text-[9px] text-[#bbc9cf] bg-white/[0.03] border border-white/[0.06] px-2 py-0.5 rounded-md flex items-center gap-1.5 hover:bg-white/[0.06] transition-colors">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#34c759] animate-pulse"></span>
+          ${r}
+        </span>
+      `).join('');
+    }
+
+    // Populate repository dropdown in explorer
+    if (explorerSelect && repos.length > 0) {
+      const currentVal = explorerSelect.value || activeExplorerRepo || repos[0];
+      explorerSelect.innerHTML = repos.map(r => `<option value="${r}">${r.split('/')[1] || r}</option>`).join('');
+      if (repos.includes(currentVal)) {
+        explorerSelect.value = currentVal;
+        activeExplorerRepo = currentVal;
+      } else {
+        explorerSelect.value = repos[0];
+        activeExplorerRepo = repos[0];
+      }
+    } else if (explorerSelect) {
+      explorerSelect.innerHTML = '<option value="">No repos</option>';
+      activeExplorerRepo = '';
+    }
+
+    if (repos.length === 0) {
+      listEl.innerHTML = `
+        <div class="py-24 text-center font-mono text-xs text-[#bbc9cf] px-4">
+          No GitHub repositories configured.<br>
+          <span class="opacity-60 text-[9px] mt-2 block text-purple-400">Add repositories in the Setup Config tab (e.g. owner/repo or repository URL).</span>
+        </div>`;
+      updateRepoExplorer();
+      return;
+    }
+
+    // Trigger repo explorer load
+    updateRepoExplorer();
+
+    try {
+      const token = localStorage.getItem('pulseboard_github_token') || '';
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `token ${token}`;
+      }
+
+      // Fetch public events for all repositories in parallel
+      const fetchPromises = repos.map(async (repo) => {
+        const res = await fetch(`https://api.github.com/repos/${repo}/events?per_page=10`, { headers });
+        if (res.status === 404) {
+          throw new Error(`Repo "${repo}" not found.`);
+        }
+        if (res.status === 403) {
+          throw new Error(`Rate limit exceeded.`);
+        }
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        return data.map(e => ({ ...e, repoName: repo }));
+      });
+
+      const results = await Promise.allSettled(fetchPromises);
+      
+      let allEvents = [];
+      let errors = [];
+
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled') {
+          allEvents = allEvents.concat(result.value);
+        } else {
+          errors.push(`${repos[idx]}: ${result.reason.message}`);
+        }
+      });
+
+      // Filter relevant activities
+      const activeEvents = allEvents.filter(e =>
+        e.type === 'PushEvent' ||
+        e.type === 'IssuesEvent' ||
+        e.type === 'PullRequestEvent' ||
+        e.type === 'CreateEvent' ||
+        e.type === 'WatchEvent' ||
+        e.type === 'ReleaseEvent' ||
+        e.type === 'IssueCommentEvent'
+      );
+
+      // Sort by creation time descending (newest first)
+      activeEvents.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+
+      if (badgeEl) {
+        const countText = repos.length === 1 ? repos[0] : `${repos.length} Repos`;
+        badgeEl.innerHTML = `${countText} <span class="ml-2 font-mono text-[9px] text-[#34c759] bg-[#34c759]/10 px-2 py-0.5 rounded-full">LIVE</span>`;
+      }
+
+      if (activeEvents.length === 0) {
+        let errHtml = errors.length > 0
+          ? `<div class="mt-4 p-3 rounded-[12px] bg-red-500/5 border border-red-500/10 text-left font-mono text-[10px] text-red-400">
+               <strong>API Failures:</strong><br>${errors.join('<br>')}
+             </div>`
+          : '';
+        listEl.innerHTML = `
+          <div class="py-24 text-center font-mono text-xs text-[#bbc9cf] px-4">
+            No recent activity found for the selected repositories.
+            ${errHtml}
+          </div>`;
+        return;
+      }
+
+      listEl.innerHTML = activeEvents.map(e => {
+        let title = 'Repository Event';
+        let desc = '';
+        let icon = 'git';
+        let bgClass = 'bg-[#00d4ff]/10 text-[#00d4ff]';
+        let actionTime = getFriendlyTime(e.created_at);
+        const repoLabel = repos.length > 1 
+          ? `<span class="px-1.5 py-0.5 rounded text-[8px] font-bold font-mono bg-white/5 border border-white/10 opacity-70 uppercase tracking-wide shrink-0" style="color:var(--pb-text-sub)">${e.repoName.split('/')[1] || e.repoName}</span>`
+          : '';
+
+        if (e.type === 'PushEvent') {
+          icon = 'commit';
+          bgClass = 'bg-[#00d4ff]/10 text-[#00d4ff]';
+          const commitCount = e.payload.commits ? e.payload.commits.length : 1;
+          const author = e.actor.login;
+          const lastCommitMsg = e.payload.commits && e.payload.commits.length > 0
+            ? e.payload.commits[0].message
+            : 'Pushed code changes';
+          title = `${author} pushed ${commitCount} commit${commitCount > 1 ? 's' : ''}`;
+          desc = `commit: "${lastCommitMsg}"`;
+        } else if (e.type === 'IssuesEvent') {
+          icon = 'error';
+          bgClass = 'bg-[#ff9500]/10 text-[#ff9500]';
+          const author = e.actor.login;
+          const action = e.payload.action;
+          const issueTitle = e.payload.issue ? e.payload.issue.title : '';
+          const num = e.payload.issue ? e.payload.issue.number : '';
+          title = `${author} ${action} issue #${num}`;
+          desc = `"${issueTitle}"`;
+        } else if (e.type === 'PullRequestEvent') {
+          icon = 'merge_type';
+          bgClass = 'bg-[#34c759]/10 text-[#34c759]';
+          const author = e.actor.login;
+          const action = e.payload.action;
+          const prTitle = e.payload.pull_request ? e.payload.pull_request.title : '';
+          const num = e.payload.pull_request ? e.payload.pull_request.number : '';
+          title = `${author} ${action} pull request #${num}`;
+          desc = `"${prTitle}"`;
+        } else if (e.type === 'CreateEvent') {
+          icon = 'add_circle';
+          bgClass = 'bg-cyan-500/10 text-cyan-400';
+          const refType = e.payload.ref_type;
+          const author = e.actor.login;
+          title = `${author} created ${refType}`;
+          desc = refType === 'repository' ? 'Created new repository' : `branch/tag: "${e.payload.ref}"`;
+        } else if (e.type === 'WatchEvent') {
+          icon = 'star';
+          bgClass = 'bg-yellow-500/10 text-yellow-400';
+          const author = e.actor.login;
+          title = `${author} starred repository`;
+          desc = 'Starred';
+        } else if (e.type === 'ReleaseEvent') {
+          icon = 'new_releases';
+          bgClass = 'bg-[#34c759]/10 text-[#34c759]';
+          const author = e.actor.login;
+          const releaseName = e.payload.release ? e.payload.release.name : '';
+          title = `${author} published release`;
+          desc = `"${releaseName}"`;
+        } else if (e.type === 'IssueCommentEvent') {
+          icon = 'forum';
+          bgClass = 'bg-amber-500/10 text-amber-400';
+          const author = e.actor.login;
+          const issueNum = e.payload.issue ? e.payload.issue.number : '';
+          title = `${author} commented on issue #${issueNum}`;
+          desc = e.payload.comment ? `"${e.payload.comment.body.substring(0, 80)}..."` : '';
+        }
+
+        return `
+          <div class="ios-glass p-3.5 rounded-[20px] flex gap-3.5 items-start transition-all hover:bg-white/[0.04]">
+            <div class="w-9 h-9 rounded-[12px] flex items-center justify-center shrink-0 ${bgClass}">
+              <span class="material-symbols-outlined text-lg">${icon}</span>
+            </div>
+            <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+              <div class="flex justify-between items-baseline w-full">
+                <span class="text-xs font-bold text-white truncate max-w-[200px]">${title}</span>
+                <span class="font-mono text-[9px] text-[#bbc9cf] opacity-50 shrink-0">${actionTime}</span>
+              </div>
+              <div class="flex items-center gap-2 mt-0.5 min-w-0">
+                ${repoLabel}
+                <span class="font-mono text-[10px] text-[#bbc9cf] opacity-75 truncate flex-1 min-w-0">${desc}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+    } catch (err) {
+      if (badgeEl) {
+        badgeEl.innerHTML = `${repos[0] || 'Repos'} <span class="ml-2 font-mono text-[9px] text-[#ff3b30] bg-[#ff3b30]/10 px-2 py-0.5 rounded-full">ERROR</span>`;
+      }
+      listEl.innerHTML = `
+        <div class="py-10 flex flex-col items-center gap-4 text-center px-4">
+          <span class="material-symbols-outlined text-[#ff3b30] text-3xl">wifi_off</span>
+          <div class="flex flex-col gap-1.5">
+            <span class="font-mono text-xs font-bold text-[#ff3b30]">GitHub API Failed</span>
+            <p class="font-mono text-[10px] text-[#bbc9cf] opacity-75 leading-relaxed max-w-sm">${err.message}</p>
+          </div>
+        </div>`;
+    }
+  }
+
+  async function updateRepoExplorer() {
+    const listEl = document.getElementById('repo-files-list');
+    if (!listEl) return;
+    
+    if (!activeExplorerRepo) {
+      listEl.innerHTML = `<div class="py-12 text-center font-mono text-xs text-[#bbc9cf]/50">No repository selected.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = `
+      <div class="py-12 text-center font-mono text-xs text-[#bbc9cf] animate-pulse">
+        Fetching repo contents...
+      </div>`;
+
+    try {
+      const token = localStorage.getItem('pulseboard_github_token') || '';
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `token ${token}`;
+      }
+      const res = await fetch(`https://api.github.com/repos/${activeExplorerRepo}/contents`, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const files = await res.json();
+      
+      if (!Array.isArray(files)) {
+        throw new Error('Root folder is not a directory');
+      }
+
+      // Sort directories first, then files
+      files.sort((a, b) => {
+        if (a.type === b.type) return a.name.localeCompare(b.name);
+        return a.type === 'dir' ? -1 : 1;
+      });
+
+      listEl.innerHTML = files.map((file, index) => {
+        const isDir = file.type === 'dir';
+        const icon = isDir ? 'folder' : 'description';
+        const colorClass = isDir ? 'text-yellow-400' : 'text-[#00d4ff]';
+        const sizeText = isDir ? '—' : getFriendlySize(file.size);
+        const rowId = `repo-file-row-${index}`;
+
+        return `
+          <div class="flex items-center justify-between p-2.5 rounded-[16px] bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] transition-all gap-3">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <span class="material-symbols-outlined ${colorClass} text-base shrink-0">${icon}</span>
+              <a href="${file.html_url}" target="_blank" class="font-mono text-[11px] text-white hover:text-[#00d4ff] hover:underline truncate block" title="Open file on GitHub">${file.name}</a>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="font-mono text-[9px] text-[#bbc9cf] opacity-50">${sizeText}</span>
+              <span id="${rowId}-time" class="font-mono text-[9px] text-[#bbc9cf]/60 w-[65px] text-right truncate">...</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Staggered loading of commit times to prevent API rate-limit throttling
+      files.forEach((file, index) => {
+        setTimeout(async () => {
+          const timeEl = document.getElementById(`repo-file-row-${index}-time`);
+          if (!timeEl) return;
+          try {
+            const token = localStorage.getItem('pulseboard_github_token') || '';
+            const headers = {};
+            if (token) {
+              headers['Authorization'] = `token ${token}`;
+            }
+            const commitRes = await fetch(`https://api.github.com/repos/${activeExplorerRepo}/commits?path=${encodeURIComponent(file.path)}&per_page=1`, { headers });
+            if (commitRes.ok) {
+              const commits = await commitRes.json();
+              if (commits && commits.length > 0) {
+                const dateStr = commits[0].commit.committer.date;
+                const commitMsg = commits[0].commit.message;
+                const friendly = getFriendlyTime(dateStr);
+                timeEl.textContent = friendly;
+                timeEl.title = `Edited: ${friendly}\nCommit: "${commitMsg}"`;
+              } else {
+                timeEl.textContent = '—';
+              }
+            } else {
+              timeEl.textContent = 'error';
+            }
+          } catch {
+            timeEl.textContent = 'error';
+          }
+        }, index * 200); // 200ms delay between files
+      });
+
+    } catch (e) {
+      listEl.innerHTML = `
+        <div class="py-10 flex flex-col items-center gap-3 text-center px-4">
+          <span class="material-symbols-outlined text-[#ff3b30] text-2xl">error_medley</span>
+          <div class="flex flex-col gap-1">
+            <span class="font-mono text-xs font-bold text-[#ff3b30]">Failed to Load files</span>
+            <span class="font-mono text-[9px] text-[#bbc9cf] opacity-75">${e.message}</span>
+          </div>
+        </div>`;
+    }
+  }
+
+  function getFriendlySize(bytes) {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function getFriendlyTime(dateStr) {
+    const date = new Date(dateStr);
+    const diffMs = new Date() - date;
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) return `${diffDays}d ago`;
+    if (diffHours > 0) return `${diffHours}h ago`;
+    if (diffMins > 0) return `${diffMins}m ago`;
+    return 'Just now';
+  }
+
+  // Setup explorer select dropdown change listener
+  document.getElementById('repo-explorer-select')?.addEventListener('change', (e: any) => {
+    activeExplorerRepo = e.target.value;
+    updateRepoExplorer();
+  });
+
+  // Initial load
+  updateGithubFeed();
+
+  // Listen for storage / custom refreshes
+  window.addEventListener('storage', updateGithubFeed);
+  window.addEventListener('refreshGithub', updateGithubFeed);
+</script>

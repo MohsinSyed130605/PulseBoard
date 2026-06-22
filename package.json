@@ -1,0 +1,8 @@
+{
+  "name": "pulseboard-monorepo",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "electron"
+  ]
+}
